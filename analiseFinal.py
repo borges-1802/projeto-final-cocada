@@ -12,11 +12,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# ============================================================================
-# 1. CONFIGURAÇÃO (PROJETO NOVO)
-# ============================================================================
+# 1. CONFIGURAÇÃO
 
-# ID do projeto onde criamos a tabela e os modelos
 BILLING_PROJECT_ID = "profound-portal-480504-a2" 
 DATASET_ID = "analise_cocada"
 
@@ -25,10 +22,7 @@ print(f" PROJETO COCADA 2025-2 - ANÁLISE VIA BIGQUERY ML ".center(80, "="))
 print("=" * 80)
 print(f"🚀 Conectando ao projeto: {BILLING_PROJECT_ID}")
 
-# ============================================================================
 # 2. QUERY DE EXTRAÇÃO (JUNTA DADOS + K-MEANS + PCA)
-# ============================================================================
-
 # Esta query faz o trabalho pesado:
 # 1. Pega os dados resumidos da tabela_resumo
 # 2. Aplica o modelo K-Means para descobrir o Cluster
@@ -56,9 +50,7 @@ JOIN dados_pca p
   ON k.linha = p.linha AND k.data = p.data
 """
 
-# ============================================================================
 # 3. EXECUÇÃO E VISUALIZAÇÃO
-# ============================================================================
 
 try:
     print("⏳ Baixando dados processados da nuvem...")
@@ -99,7 +91,6 @@ try:
 
     # --- GRÁFICO 3: Ranking de Linhas (Quem perde mais tempo?) ---
     plt.figure(figsize=(14, 6))
-    # Ordena as linhas pela mediana de tempo gasto
     order = df.groupby('linha')['tempo_total_fundao'].median().sort_values(ascending=False).index
     
     sns.boxplot(x='linha', y='tempo_total_fundao', data=df, order=order, palette="Blues_r")
@@ -121,15 +112,13 @@ except Exception as e:
     print(e)
     print("\nDICA: Verifique se você rodou os comandos 'CREATE MODEL' no BigQuery Console antes de executar este script.")
 
-# ============================================================================
 # 4. PLOTANDO O MAPA REAL (CORRIGIDO)
-# ============================================================================
+
 
 import plotly.express as px
 
 print("\n🗺️ Gerando mapa geoespacial do Fundão...")
 
-# Alteração: Trocamos 'gps_sppo' por 'gps_onibus' que funcionou antes
 query_mapa = f"""
 WITH classificacao_do_dia AS (
     -- Descobre qual é o cluster de cada linha neste dia
@@ -163,7 +152,6 @@ LIMIT 5000
 """
 
 try:
-    # Adicionei reauth=True por segurança
     df_mapa = bd.read_sql(query_mapa, billing_project_id=BILLING_PROJECT_ID)
     
     if len(df_mapa) > 0:

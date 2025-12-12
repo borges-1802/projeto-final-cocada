@@ -1,12 +1,3 @@
-"""
-Projeto COCADA 2025-2: Análise de Atrasos - Linhas do Fundão
-João Victor Borges Nascimento - 121064604
-
-FOCO: Atrasos especificamente nos pontos da Cidade Universitária
-
-Usando Base dos Dados (basedosdados) para acesso aos dados
-"""
-
 import basedosdados as bd
 import pandas as pd
 import numpy as np
@@ -24,10 +15,6 @@ warnings.filterwarnings('ignore')
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (12, 6)
 
-# ============================================================================
-# CONFIGURAÇÃO
-# ============================================================================
-
 BILLING_PROJECT_ID = "universal-helix-468201-g9"
 
 # Linhas que atendem o Fundão
@@ -36,7 +23,6 @@ LINHAS_FUNDAO = [
     ]
 
 # Coordenadas da Cidade Universitária (bounding box aproximado)
-# Ilha do Fundão fica entre essas coordenadas
 FUNDAO_LAT_MIN = -22.870
 FUNDAO_LAT_MAX = -22.838
 FUNDAO_LON_MIN = -43.250
@@ -49,9 +35,7 @@ DATA_FIM = '2025-11-30'
 # Threshold de atraso
 ATRASO_THRESHOLD = 15  # minutos
 
-# ============================================================================
 # 0. FUNÇÃO DE TESTE DE CONEXÃO
-# ============================================================================
 
 def testar_conexao(billing_project_id):
     """
@@ -62,7 +46,6 @@ def testar_conexao(billing_project_id):
     print("=" * 80)
     
     try:
-        # Teste 1: Conexão básica
         print("\n[TESTE 1] Testando conexão com BigQuery...")
         df_test = bd.read_sql("""
             SELECT COUNT(*) as total
@@ -71,7 +54,6 @@ def testar_conexao(billing_project_id):
         """, billing_project_id=billing_project_id)
         print(f"✅ Conexão OK! Total de registros na tabela: {df_test['total'].iloc[0]:,}")
         
-        # Teste 2: Verificar linhas disponíveis
         print("\n[TESTE 2] Verificando linhas disponíveis...")
         linhas_str = "', '".join(LINHAS_FUNDAO)
         df_linhas = bd.read_sql(f"""
@@ -93,7 +75,6 @@ def testar_conexao(billing_project_id):
         for _, row in df_linhas.iterrows():
             print(f"   Linha {row['servico']:>6s}: {row['total']:>6,} viagens")
         
-        # Teste 3: Verificar dados GPS
         print("\n[TESTE 3] Verificando dados GPS...")
         df_gps_test = bd.read_sql(f"""
             SELECT servico, COUNT(*) as total
@@ -110,7 +91,6 @@ def testar_conexao(billing_project_id):
         
         print(f"✅ Dados GPS encontrados para {len(df_gps_test)} linhas")
         
-        # Teste 4: Verificar GPS no Fundão
         print("\n[TESTE 4] Verificando GPS dentro do Fundão...")
         df_fundao_test = bd.read_sql(f"""
             SELECT COUNT(*) as total
@@ -144,9 +124,7 @@ def testar_conexao(billing_project_id):
         print("   3. gcloud auth application-default login")
         return False
 
-# ============================================================================
 # 1. EXTRAÇÃO DE DADOS - GPS NOS PONTOS DO FUNDÃO
-# ============================================================================
 
 def extrair_gps_fundao(billing_project_id, teste=False):
     """
@@ -278,9 +256,7 @@ def extrair_viagens_completas(billing_project_id, teste=False):
         print(f"❌ Erro: {e}")
         return None
 
-# ============================================================================
 # 2. PRÉ-PROCESSAMENTO - FOCO NO FUNDÃO
-# ============================================================================
 
 def calcular_tempo_no_fundao(df_gps):
     print("\n" + "=" * 80)
@@ -355,7 +331,6 @@ def calcular_atrasos_com_contexto(df_viagens, tempo_fundao):
     print(f"   Tempo médio calculado: {df['tempo_viagem_min'].mean():.1f} min")
     
     # 3. Limpeza (remover erros de GPS: viagens < 5 min ou > 4 horas)
-    # Isso remove viagens fantasmas ou erros de sistema
     df = df[(df['tempo_viagem_min'] > 5) & (df['tempo_viagem_min'] < 240)]
     print(f"   Registros após filtro de consistência (>5min): {len(df)}")
 
@@ -455,9 +430,7 @@ def agregar_por_linha_dia(df_viagens, tempo_fundao):
     
     return agregado
 
-# ============================================================================
 # 3. ANÁLISE EXPLORATÓRIA
-# ============================================================================
 
 def analise_exploratoria(df_agregado):
     print("\n" + "=" * 80)
@@ -465,17 +438,11 @@ def analise_exploratoria(df_agregado):
     print("=" * 80)
 
     df = df_agregado.copy()
-
-    # 1. Corrigir zeros artificiais
     df['tempo_fundao_total'] = df['tempo_fundao_total'].replace(0, np.nan)
     df['velocidade_fundao'] = df['velocidade_fundao'].replace(0, np.nan)
-
-    # --- ALTERAÇÃO AQUI: Baixei de 10 para 1 para garantir que o teste funcione ---
     linhas_min = df['linha'].value_counts()
     linhas_validas = linhas_min[linhas_min >= 1].index
     df = df[df['linha'].isin(linhas_validas)]
-    # -----------------------------------------------------------------------------
-
     if len(df) == 0:
         print("⚠️  Dados insuficientes para gerar rankings no modo de teste.")
         return df, df, df, df
@@ -517,14 +484,9 @@ def analise_exploratoria(df_agregado):
 
     return ranking_atraso, ranking_prop, ranking_tempo_fundao, ranking_vel_fundao
 
-# ============================================================================
 # 4. PCA
-# ============================================================================
 
 def aplicar_pca(df_filtrado, n_components=3):
-    """
-    PCA incluindo features do Fundão (Versão Robusta)
-    """
     print("\n" + "=" * 80)
     print(" PCA - ANÁLISE DE COMPONENTES PRINCIPAIS ".center(80, "="))
     print("=" * 80)
@@ -544,10 +506,7 @@ def aplicar_pca(df_filtrado, n_components=3):
     X = df_filtrado[features].fillna(0)
     X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
     
-    # --- CORREÇÃO DE SEGURANÇA ---
-    n_samples, n_features = X.shape
-    
-    # O número de componentes não pode ser maior que o número de amostras ou features
+    n_samples, n_features = X.shape    
     n_components_possivel = min(n_components, n_samples, n_features)
     
     if n_components_possivel < 2:
@@ -559,7 +518,6 @@ def aplicar_pca(df_filtrado, n_components=3):
     if n_components_possivel < n_components:
         print(f"\n⚠️  Ajustando n_components de {n_components} para {n_components_possivel} devido à baixa quantidade de dados.")
         n_components = n_components_possivel
-    # -----------------------------
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -591,9 +549,7 @@ def aplicar_pca(df_filtrado, n_components=3):
     
     return X_pca, pca, scaler, X_scaled, features
 
-# ============================================================================
 # 5-6. K-MEANS E VISUALIZAÇÕES (MANTÉM O CÓDIGO ORIGINAL)
-# ============================================================================
 
 def determinar_k_otimo(X, k_range=range(2, 8)):
     """Método do cotovelo + silhouette"""
@@ -817,9 +773,7 @@ def visualizar_rankings(ranking_atraso, ranking_prop, ranking_tempo_fundao):
     plt.savefig('rankings.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-# ============================================================================
 # 7. PIPELINE COMPLETO
-# ============================================================================
 
 def pipeline_completo(billing_project_id, teste=False, skip_test=False):
     """
@@ -936,10 +890,6 @@ def pipeline_completo(billing_project_id, teste=False, skip_test=False):
         'df_clusters': df_clusters
     }
 
-# ============================================================================
-# EXECUTAR
-# ============================================================================
-
 if __name__ == "__main__":
     print("\n" + "=" * 80)
     print(" INSTRUÇÕES DE USO ".center(80))
@@ -955,5 +905,4 @@ if __name__ == "__main__":
     print("   resultados = pipeline_completo(BILLING_PROJECT_ID, teste=False)")
     print("\n" + "=" * 80)
     
-    # Descomente para executar:
     resultados = pipeline_completo(BILLING_PROJECT_ID, teste=False)
